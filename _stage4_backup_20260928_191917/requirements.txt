@@ -1,0 +1,12 @@
+# Stage 1 essentials
+python-dotenv==1.0.1
+PyYAML==6.0.2
+pip==24.3.1
+setuptools==75.6.0
+wheel==0.45.1
+
+# Stage 2+ (data science core)
+numpy==2.1.3
+pandas==2.2.3
+scikit-learn==1.5.2
+matplotlib==3.9.2

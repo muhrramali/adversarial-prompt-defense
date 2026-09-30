@@ -1,0 +1,33 @@
+# Python
+__pycache__/
+*.py[cod]
+*.pyo
+*.pyd
+*.so
+*.egg-info/
+.venv/
+venv/
+.env
+.env.*
+
+# Jupyter / notebooks checkpoints
+.ipynb_checkpoints/
+
+# Project large/generated folders
+models/
+data/
+logs/
+results/
+frontend/results/
+reports/
+notebooks/
+
+# OS/editor
+.DS_Store
+Thumbs.db
+.vscode/
+
+# Test coverage / caches
+.pytest_cache/
+.coverage
+htmlcov/

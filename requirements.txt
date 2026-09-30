@@ -1,0 +1,42 @@
+# ============================================================
+# Adversarial Prompt Injection Detection and Defense
+# Stage 1 requirements — minimal set needed to bootstrap project
+# We will EXTEND this file in later stages (ML libs, API, frontend)
+# ============================================================
+
+# --- Stage 1: Environment & Config ---
+python-dotenv==1.0.1          # Load .env files (secrets, config)
+PyYAML==6.0.2                  # Read YAML config files
+pip==24.3.1                    # Ensure recent pip
+setuptools==75.6.0            # Build tooling
+wheel==0.45.1                 # Wheel packaging
+
+# --- Stage 2+: Data Science Core (install now, used later) ---
+numpy==2.1.3                  # Numerical ops
+pandas==2.2.3                 # Dataset manipulation
+scikit-learn==1.5.2           # Metrics, train/test split, baseline
+
+# --- Stage 4+: ML / BERT (install with the commands in docs/STAGE_04_SETUP.md) ---
+# For CPU-only torch on Windows:
+#   pip install torch==2.5.1 --index-url https://download.pytorch.org/whl/cpu
+# For torch with CUDA support (if you have an NVIDIA GPU):
+#   pip install torch==2.5.1
+torch==2.5.1
+transformers==4.46.3
+tokenizers==0.20.3
+accelerate==1.1.1
+
+# --- Stage 11+: API ---
+# Uncomment when you reach Stage 11.
+# fastapi==0.115.5
+# uvicorn[standard]==0.32.1
+# pydantic==2.10.2
+
+# --- Stage 13+: Testing ---
+# pytest==8.3.3
+# httpx==0.27.2              # For FastAPI test client
+
+# --- Stage 14+: Visualization / Notebooks ---
+# matplotlib==3.9.2
+# seaborn==0.13.2
+# jupyter==1.1.1

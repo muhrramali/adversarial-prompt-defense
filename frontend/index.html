@@ -1,0 +1,198 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <meta name="theme-color" content="#0f1419">
+    <title>Prompt Defense | Security Console</title>
+    <link rel="stylesheet" href="style.css">
+</head>
+<body>
+    <header class="topbar">
+        <a class="brand" href="#" aria-label="Prompt Defense home">
+            <span class="brand-mark" aria-hidden="true">PD</span>
+            <span class="brand-copy">
+                <strong>Prompt Defense</strong>
+                <small>SECURITY RESEARCH CONSOLE</small>
+            </span>
+        </a>
+        <div class="header-meta">
+            <span class="environment"><span class="environment-dot"></span> LOCAL API</span>
+            <div id="api-status" class="status-badge checking" role="status" aria-live="polite">
+                <span class="status-dot"></span><span>Checking API</span>
+            </div>
+        </div>
+    </header>
+
+    <main>
+        <section class="page-heading">
+            <div>
+                <p class="eyebrow">PROMPT INJECTION DEFENSE</p>
+                <h1>Security Console</h1>
+                <p class="subtitle">Inspect prompts, evaluate policy decisions, and test the full copilot pipeline.</p>
+            </div>
+            <span class="model-chip">DETECTOR <strong id="detector-name">bert_adv</strong></span>
+        </section>
+
+        <nav class="tabs" aria-label="Dashboard sections" role="tablist">
+            <button class="nav-btn active" id="tab-playground" role="tab" aria-selected="true" aria-controls="playground" onclick="showTab('playground', this)">Playground</button>
+            <button class="nav-btn" id="tab-evaluation" role="tab" aria-selected="false" aria-controls="evaluation" onclick="showTab('evaluation', this)">Evaluation</button>
+            <button class="nav-btn" id="tab-about" role="tab" aria-selected="false" aria-controls="about" onclick="showTab('about', this)">About</button>
+        </nav>
+
+        <section id="playground" class="tab-content active" role="tabpanel" aria-labelledby="tab-playground">
+            <div class="playground-layout">
+                <section class="panel prompt-panel" aria-labelledby="prompt-title">
+                    <div class="section-heading">
+                        <div>
+                            <p class="eyebrow">INPUT</p>
+                            <h2 id="prompt-title">Prompt inspection</h2>
+                        </div>
+                        <span class="step-number">01</span>
+                    </div>
+                    <label class="sr-only" for="prompt-input">Prompt to analyze</label>
+                    <textarea id="prompt-input" maxlength="10000" placeholder="Paste or write a prompt to inspect..." spellcheck="false"></textarea>
+                    <div class="input-meta"><span>Up to 10,000 characters</span><span id="prompt-count">0 / 10,000</span></div>
+                    <div class="button-row">
+                        <button class="btn btn-detect" type="button" onclick="callDetect()">Detect</button>
+                        <button class="btn btn-analyze" type="button" onclick="callAnalyze()">Analyze</button>
+                        <button class="btn btn-chat" type="button" onclick="callChat()">Run full pipeline</button>
+                        <button class="btn btn-clear" type="button" onclick="clearAll()">Clear</button>
+                    </div>
+                    <div id="request-error" class="request-error hidden" role="alert"></div>
+                </section>
+
+                <section class="panel quick-panel" aria-labelledby="quick-title">
+                    <div class="section-heading">
+                        <div>
+                            <p class="eyebrow">SAMPLE LIBRARY</p>
+                            <h2 id="quick-title">Quick tests</h2>
+                        </div>
+                        <span class="step-number">02</span>
+                    </div>
+                    <p class="muted">Choose a sample to load it into the prompt inspector.</p>
+                    <div class="test-buttons">
+                        <button class="btn-test benign-test" type="button" data-case="firewall">Benign: Firewall log</button>
+                        <button class="btn-test attack-test" type="button" data-case="direct">Attack: Direct injection</button>
+                        <button class="btn-test attack-test" type="button" data-case="role">Attack: Role manipulation</button>
+                        <button class="btn-test attack-test" type="button" data-case="indirect">Attack: Indirect injection</button>
+                        <button class="btn-test benign-test" type="button" data-case="cve">Benign: CVE question</button>
+                        <button class="btn-test attack-test" type="button" data-case="extraction">Attack: System prompt extraction</button>
+                    </div>
+                </section>
+            </div>
+
+            <section class="results-section" aria-labelledby="results-title">
+                <div class="section-heading results-heading">
+                    <div>
+                        <p class="eyebrow">PIPELINE OUTPUT</p>
+                        <h2 id="results-title">Analysis results</h2>
+                    </div>
+                    <div id="loading" class="loading hidden" role="status"><span class="spinner"></span> Processing request</div>
+                </div>
+                <div class="results-grid">
+                    <article id="detection-result" class="result-card hidden">
+                        <div class="card-heading"><span class="card-index">A</span><h3>Detection</h3><span class="card-source">MODEL</span></div>
+                        <div class="result-grid">
+                            <div class="result-item"><span class="label">Label</span><span id="det-label" class="value">—</span></div>
+                            <div class="result-item"><span class="label">Confidence</span><span id="det-confidence" class="value">—</span></div>
+                            <div class="result-item"><span class="label">Risk level</span><span id="det-risk" class="value">—</span></div>
+                            <div class="result-item"><span class="label">Attack type</span><span id="det-attack-type" class="value">—</span></div>
+                        </div>
+                    </article>
+                    <article id="policy-result" class="result-card hidden">
+                        <div class="card-heading"><span class="card-index">B</span><h3>Policy decision</h3><span class="card-source">POLICY</span></div>
+                        <div class="result-grid">
+                            <div class="result-item"><span class="label">Action</span><span id="pol-action" class="value">—</span></div>
+                            <div class="result-item"><span class="label">Reason</span><span id="pol-reason" class="value">—</span></div>
+                        </div>
+                    </article>
+                    <article id="chat-result" class="result-card chat-card hidden">
+                        <div class="card-heading"><span class="card-index">C</span><h3>Copilot response</h3><span class="card-source">FULL PIPELINE</span></div>
+                        <div class="result-grid chat-meta">
+                            <div class="result-item"><span class="label">Action</span><span id="chat-action" class="value">—</span></div>
+                            <div class="result-item"><span class="label">Confidence</span><span id="chat-confidence" class="value">—</span></div>
+                            <div class="result-item"><span class="label">Risk level</span><span id="chat-risk" class="value">—</span></div>
+                            <div class="result-item"><span class="label">Detector</span><span id="chat-detector" class="value">—</span></div>
+                        </div>
+                        <div id="chat-blocked-banner" class="banner hidden" role="alert"><strong>BLOCKED</strong><span id="chat-block-reason">Prompt blocked by security policy.</span></div>
+                        <div id="chat-response-text" class="llm-response" aria-live="polite">—</div>
+                    </article>
+                </div>
+            </section>
+        </section>
+
+        <section id="evaluation" class="tab-content" role="tabpanel" aria-labelledby="tab-evaluation" hidden>
+            <div class="section-heading page-section-heading">
+                <div><p class="eyebrow">BENCHMARKS</p><h2>Evaluation results</h2></div>
+                <span class="sample-size">TEST SET <strong>n = 19</strong></span>
+            </div>
+            <div class="figures-grid">
+                <figure class="figure-card"><figcaption><h3>Per-attack-type recall</h3><span>Recall by category</span></figcaption><img src="../results/figures/fig_per_attack_type_recall.png" alt="Recall comparison by attack type"></figure>
+                <figure class="figure-card"><figcaption><h3>Overall metrics</h3><span>Detector comparison</span></figcaption><img src="../results/figures/fig_overall_metrics.png" alt="Overall metrics comparison"></figure>
+                <figure class="figure-card"><figcaption><h3>Confusion matrices</h3><span>Prediction outcomes</span></figcaption><img src="../results/figures/fig_confusion_matrices.png" alt="Confusion matrices for the evaluated models"></figure>
+                <figure class="figure-card"><figcaption><h3>Threshold curve</h3><span>Precision and recall trade-off</span></figcaption><img src="../results/figures/fig_threshold_curve.png" alt="Threshold sweep curve"></figure>
+                <figure class="figure-card"><figcaption><h3>Confidence distribution</h3><span>Model score distributions</span></figcaption><img src="../results/figures/fig_confidence_distribution.png" alt="Confidence score distributions"></figure>
+            </div>
+            <section class="table-section" aria-labelledby="comparison-title">
+                <div class="section-heading"><div><p class="eyebrow">MODEL BENCHMARK</p><h2 id="comparison-title">Three-way comparison</h2></div></div>
+                <div class="table-wrap"><table class="metrics-table">
+                    <thead><tr><th scope="col">Metric</th><th scope="col">Model A <small>rule_based</small></th><th scope="col">Model B <small>bert</small></th><th scope="col" class="best-model">Model C <small>bert_adv</small></th></tr></thead>
+                    <tbody>
+                        <tr><th scope="row">Accuracy</th><td>0.5789</td><td>0.8947</td><td class="best-model">0.9474</td></tr>
+                        <tr><th scope="row">Precision</th><td>1.0000</td><td>1.0000</td><td class="best-model">1.0000</td></tr>
+                        <tr><th scope="row">Recall</th><td>0.3846</td><td>0.8462</td><td class="best-model">0.9231</td></tr>
+                        <tr><th scope="row">F1</th><td>0.5556</td><td>0.9167</td><td class="best-model">0.9600</td></tr>
+                        <tr><th scope="row">FPR</th><td>0.0000</td><td>0.0000</td><td class="best-model">0.0000</td></tr>
+                        <tr><th scope="row">FNR</th><td>0.6154</td><td>0.1538</td><td class="best-model">0.0769</td></tr>
+                    </tbody>
+                </table></div>
+                <p class="muted table-note">Results from the project evaluation set. See the reports directory for experiment details.</p>
+            </section>
+        </section>
+
+        <section id="about" class="tab-content" role="tabpanel" aria-labelledby="tab-about" hidden>
+            <div class="section-heading page-section-heading"><div><p class="eyebrow">PROJECT NOTES</p><h2>About the defense</h2></div></div>
+            <div class="about-layout">
+                <section class="panel about-intro">
+                    <p class="eyebrow">RESEARCH PROTOTYPE</p>
+                    <h3>Adversarial prompt-injection detection for security copilots</h3>
+                    <p>This project evaluates defense-in-depth strategies for identifying and blocking prompt-injection attacks against LLM-powered security copilots.</p>
+                </section>
+                <section class="panel architecture-panel">
+                    <p class="eyebrow">REQUEST FLOW</p><h3>Defense architecture</h3>
+                    <div class="architecture-flow" aria-label="User prompt flows through normalization, detection, policy, language model, and output validation before response">
+                        <div class="flow-node"><span>01</span><strong>User prompt</strong></div><i aria-hidden="true">›</i>
+                        <div class="flow-node"><span>02</span><strong>Normalize</strong></div><i aria-hidden="true">›</i>
+                        <div class="flow-node flow-detect"><span>03</span><strong>Detect</strong></div><i aria-hidden="true">›</i>
+                        <div class="flow-node flow-policy"><span>04</span><strong>Policy</strong></div><i aria-hidden="true">›</i>
+                        <div class="flow-node"><span>05</span><strong>LLM</strong></div><i aria-hidden="true">›</i>
+                        <div class="flow-node"><span>06</span><strong>Validate</strong></div><i aria-hidden="true">›</i>
+                        <div class="flow-node flow-response"><span>07</span><strong>Response</strong></div>
+                    </div>
+                </section>
+                <section class="panel findings-panel">
+                    <p class="eyebrow">OBSERVED IN EVALUATION</p><h3>Key findings</h3>
+                    <ul class="finding-list">
+                        <li><strong>46%</strong><span>relative recall improvement from rule-based to BERT (0.3846 to 0.8462).</span></li>
+                        <li><strong>0.92</strong><span>recall achieved by adversarially trained BERT, with 0% false-positive rate on this test set.</span></li>
+                        <li><strong>0%</strong><span>attack leak rate observed for bert_adv in the evaluated adversarial tests.</span></li>
+                    </ul>
+                </section>
+                <section class="panel limitations-panel">
+                    <p class="eyebrow">SCOPE & CAVEATS</p><h3>Limitations</h3>
+                    <ul>
+                        <li>Small evaluation set (n = 19), so measured rates have high variance.</li>
+                        <li>Adversarial training used transforms similar to those in testing; contamination is possible.</li>
+                        <li>Confidence scores are not calibrated.</li>
+                        <li>The DistilBERT detector is binary and does not classify attack categories on its own.</li>
+                    </ul>
+                </section>
+            </div>
+        </section>
+    </main>
+
+    <footer><span>ADVERSARIAL PROMPT INJECTION DEFENSE</span><span>RESEARCH PROTOTYPE · LOCAL INSTANCE</span></footer>
+    <script src="app.js"></script>
+</body>
+</html>

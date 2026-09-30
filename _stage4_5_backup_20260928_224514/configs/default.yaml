@@ -1,0 +1,156 @@
+# ============================================================
+# Default configuration for the Adversarial Prompt Injection
+# Defense pipeline. Loaded by src/utils/config.py
+#
+# IMPORTANT: All thresholds here are EXPERIMENTAL CONFIGURATION
+# PARAMETERS, not scientifically optimal values. They are
+# starting points to be tuned via Experiment 7 (Threshold Analysis).
+# ============================================================
+
+project:
+  name: adversarial-prompt-defense
+  version: "0.1.0"
+  description: "Defense-in-depth pipeline for detecting prompt-injection attacks against LLM-powered security copilots."
+  random_seed: 42
+
+# ---------- Detection ----------
+detection:
+  # Which detector to use: "rule_based" | "bert" | "ensemble"
+  default_detector: rule_based
+
+  bert:
+    model_name: distilbert-base-uncased
+    max_length: 256
+    batch_size: 16
+    learning_rate: 0.00002        # 2e-5
+    epochs: 3
+    weight_decay: 0.01
+    early_stopping_patience: 1
+    train_on_cpu: true            # Set false if CUDA available
+
+  rule_based:
+    # Substrings / regex patterns used by the Stage 3 baseline.
+    # Each pattern is a (name, pattern) entry. Patterns are CASE-INSENSITIVE.
+    #
+    # DESIGN NOTE: These patterns catch *direct* attack phrasings but
+    # deliberately miss paraphrases (e.g., "cast aside all earlier directives")
+    # and obfuscated variants (e.g., "1gn0r3 pr3v10us"). This is the
+    # baseline's intentional weakness — it motivates the BERT classifier
+    # in Stage 4 and adversarial training in Stage 7.
+    case_insensitive: true
+    patterns:
+      instruction_override:
+        # Use `(?:...)*` instead of `(?:...)?` so multiple modifiers are allowed:
+        # "ignore all previous instructions" should match.
+        - "ignore (?:all |previous |prior |the )*(?:instructions|prompts|rules)"
+        - "disregard (?:all |previous |prior |the |everything |above )*(?:instructions|prompts|rules|guidance|directives)"
+        - "forget (?:all |previous |prior |your |everything )*(?:instructions|prompts|rules)"
+        - "you are no longer (?:a|an) .*?(?:assistant|copilot|ai)"
+      system_prompt_extraction:
+        # Allow extra words between verb and noun ("reveal your hidden system prompt")
+        - "reveal (?:your |the )?(?:initial |hidden |system )*(?:prompt|instructions)"
+        - "show me (?:your |the )?(?:system prompt|hidden instructions|initial prompt)"
+        - "what (?:are|is) your .*?(?:instructions|prompt|configuration)"
+        - "print (?:your |the )?(?:hidden |system |initial )*(?:prompt|instructions)"
+        - "share (?:your |the )?(?:system |hidden |initial )*(?:prompt|instructions)"
+        - "tell me .*?(?:system prompt|hidden instructions|initial prompt)"
+        - "dump (?:your |the )?(?:configuration|system prompt|initial prompt)"
+      role_manipulation:
+        - "you are now (?:in |a )?(?:developer|admin|root|god|jailbreak) mode"
+        - "act as (?:if you (?:are|were) )?(?:dan|jailbreak|evil)"
+        - "enable (?:developer|jailbreak|god|root) mode"
+        - "pretend you (?:are|can) (?:do|access) anything"
+        - "activate (?:developer|jailbreak|god|root) mode"
+      policy_bypass:
+        - "(?:override|bypass|disable) (?:the |all )?(?:safety|security|content|moderation) (?:filter|policy|rules|system)"
+        - "no longer (?:follow|apply) (?:the )?(?:safety|security) (?:rules|policy)"
+        - "suspend (?:the |all )?(?:previous |prior )?(?:guidelines|rules|safety)"
+      data_exfiltration:
+        - "send (?:the |all )?(?:data|secrets|keys|tokens) to"
+        - "exfiltrate"
+        - "post (?:the |all )?(?:secrets|keys) to"
+
+# ---------- Risk / Policy Engine (Stage 8) ----------
+policy:
+  # Confidence thresholds. The detector returns confidence in [0, 1]
+  # that the prompt is a prompt-injection attack.
+  #
+  #   confidence <  allow_below    -> ALLOW   (send to LLM)
+  #   allow_below <= confidence < review_below -> REVIEW
+  #   confidence >= block_at_or_above          -> BLOCK
+  #
+  # REVIEW means: do not auto-send to LLM; surface for human/secondary check.
+  #
+  # These values are STARTING POINTS for Experiment 7, not optimal values.
+  allow_below: 0.40
+  review_below: 0.70
+  block_at_or_above: 0.70
+
+  # Hard rules that ALWAYS block regardless of classifier confidence.
+  # Use for known-critical patterns (e.g., obvious jailbreaks).
+  always_block_patterns: []
+
+  # Hard rules that ALWAYS allow regardless of classifier confidence.
+  # Use sparingly — risks bypassing the classifier entirely.
+  always_allow_patterns: []
+
+# ---------- Preprocessing (Stage 13) ----------
+preprocessing:
+  normalize_unicode: true          # NFC normalization
+  normalize_whitespace: true        # collapse runs of whitespace
+  strip_control_chars: true        # remove \x00-\x1F (except \t \n)
+  max_input_length: 4000            # hard cap, characters
+  lowercase_for_matching: true     # for rule-based only; classifier uses own tokenizer
+
+# ---------- LLM Copilot (Stage 9) ----------
+llm:
+  use_mock: true                   # Set false in .env to use a real API
+  mock:
+    model_name: mock-security-copilot
+  real:
+    provider: openai                # openai | anthropic | local
+    model: gpt-4o-mini
+    temperature: 0.0                # deterministic for reproducibility
+    max_tokens: 512
+
+  # Output validation (Stage 16)
+  output_validation:
+    block_if_contains:
+      - "API_KEY="                   # detect accidental secret leakage
+      - "BEGIN PRIVATE KEY"
+      - "rm -rf"
+    block_if_starts_with:
+      - "Sure, here is how to"      # naive canary for compliance-style answers
+
+# ---------- Security Logging (Stage 21) ----------
+logging:
+  level: INFO
+  log_dir: logs
+  structured_json: true             # emit JSON lines
+  redact_pii: true                  # naive redaction of emails/keys in logs
+
+# ---------- Evaluation (Stage 14) ----------
+evaluation:
+  test_set_path: data/test/test.csv
+  metrics:
+    - accuracy
+    - precision
+    - recall
+    - f1
+    - false_positive_rate
+    - false_negative_rate
+    - roc_auc
+  confusion_matrix: true
+  per_attack_type_breakdown: true
+  measure_latency: true
+  latency_warmup_runs: 5
+  latency_measured_runs: 50
+
+# ---------- API Server (Stage 11) ----------
+api:
+  host: 127.0.0.1
+  port: 8000
+  cors_origins:
+    - "http://localhost:3000"
+    - "http://127.0.0.1:3000"
+  rate_limit_per_minute: 60
